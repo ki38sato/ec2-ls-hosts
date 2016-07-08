@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"gopkg.in/ini.v1"
 	"os"
+	"strings"
 )
 
 const (
@@ -17,17 +18,29 @@ const (
 )
 
 // creds "env" or "shared" or "ec2"
-func SelectCredentials(creds string) (*credentials.Credentials, error) {
+func SelectCredentials(creds string, profiles string) ([]*credentials.Credentials, error) {
 	sharedCredsFile := os.Getenv("HOME") + SHARED_CREDS_FILENAME
 	switch creds {
 	case "env":
-		return credentials.NewEnvCredentials(), nil
+		return []*credentials.Credentials{
+			credentials.NewEnvCredentials(),
+		}, nil
 	case "shared":
-		return credentials.NewSharedCredentials(sharedCredsFile, SHARED_CREDS_PROFILE), nil
+		return []*credentials.Credentials{
+			credentials.NewSharedCredentials(sharedCredsFile, SHARED_CREDS_PROFILE),
+		}, nil
+	case "shared_multi":
+		credentials_list := make([]*credentials.Credentials, 0)
+		for _, profile := range strings.Split(profiles, ",") {
+			credentials_list = append(credentials_list, credentials.NewSharedCredentials(sharedCredsFile, profile))
+		}
+		return credentials_list, nil
 	case "ec2":
-		return credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{
-			Client: ec2metadata.New(session.New()),
-		}), nil
+		return []*credentials.Credentials{
+			credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{
+				Client: ec2metadata.New(session.New()),
+			}),
+		}, nil
 	case "":
 
 		providers := []credentials.Provider{
@@ -39,7 +52,7 @@ func SelectCredentials(creds string) (*credentials.Credentials, error) {
 			&ec2rolecreds.EC2RoleProvider{
 				Client: ec2metadata.New(session.New()),
 			}}
-		return credentials.NewChainCredentials(providers), nil
+		return []*credentials.Credentials{credentials.NewChainCredentials(providers)}, nil
 	default:
 		return nil, errors.New("Unknown creds name: " + creds)
 	}

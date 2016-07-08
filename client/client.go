@@ -32,6 +32,7 @@ type Options struct {
 	Fields      []string
 	Region      string
 	Credentials string
+	Profiles    string
 	Noheader    bool
 }
 
@@ -52,22 +53,44 @@ func (o *Options) FieldNames() []string {
 func Describe(o *Options, w Writer) error {
 	// build queries
 	config := &aws.Config{Region: aws.String(o.Region)}
-	credentials, err := creds.SelectCredentials(o.Credentials)
+	credentials_list, err := creds.SelectCredentials(o.Credentials, o.Profiles)
 	if err != nil {
 		return err
 	}
-	config.Credentials = credentials
+	instances := make([]*ec2.Instance,0)
+	for _, credentials := range credentials_list {
+		config.Credentials = credentials
+		list, err := listInstances(config, o.Filters, o.TagFilters)
+		if err != nil {
+			return err
+		}
+		instances = append(instances, list...)
+	}
+
+	if o.Noheader == false {
+		w.SetHeader(o.FieldNames())
+	}
+	for _, inst := range instances {
+		values := formatInstance(inst, o.FieldNames())
+		w.Append(values)
+	}
+	w.Render()
+
+	return nil
+}
+
+func listInstances(config *aws.Config, filters map[string]string, tagFilters map[string]string) ([]*ec2.Instance, error) {
 	svc := ec2.New(session.New(), config)
 
 	// call aws api
 	options := &ec2.DescribeInstancesInput{}
-	for k, v := range o.Filters {
+	for k, v := range filters {
 		options.Filters = append(options.Filters, &ec2.Filter{
 			Name:   aws.String(k),
 			Values: []*string{aws.String(v)},
 		})
 	}
-	for k, v := range o.TagFilters {
+	for k, v := range tagFilters {
 		options.Filters = append(options.Filters, &ec2.Filter{
 			Name:   aws.String("tag:" + k),
 			Values: []*string{aws.String(v)},
@@ -77,24 +100,16 @@ func Describe(o *Options, w Writer) error {
 	// show info
 	resp, err := svc.DescribeInstances(options)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(resp.Reservations) == 0 {
-		return errors.New("Not Found")
+		return nil, errors.New("Not Found")
 	}
-
-	if o.Noheader == false {
-		w.SetHeader(o.FieldNames())
-	}
+	instances := make([]*ec2.Instance, 0)
 	for idx, _ := range resp.Reservations {
-		for _, inst := range resp.Reservations[idx].Instances {
-			values := formatInstance(inst, o.FieldNames())
-			w.Append(values)
-		}
+		instances = append(instances, resp.Reservations[idx].Instances...)
 	}
-	w.Render()
-
-	return nil
+	return instances, nil
 }
 
 func formatInstance(inst *ec2.Instance, fields []string) []string {
