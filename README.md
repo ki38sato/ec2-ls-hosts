@@ -59,7 +59,12 @@ support credentials
 
 - env
 - shared
+- shared_multi (with profiles)
 - ec2
+
+`-profiles`
+
+use multiple aws profiles (with shared_multi)
 
 `-noheader`
 
