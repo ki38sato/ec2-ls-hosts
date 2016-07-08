@@ -66,6 +66,10 @@ support credentials
 
 use multiple aws profiles (with shared_multi)
 
+`-sortfield`
+
+specify sort field number 
+
 `-noheader`
 
 Not Display field headers, if set true.
