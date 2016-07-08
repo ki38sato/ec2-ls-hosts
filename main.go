@@ -64,6 +64,7 @@ func optionsFromFile() *client.Options {
 		opt.Fields = parseFieldsString(cfg.Section("options").Key("fields").Value())
 		opt.Credentials = cfg.Section("options").Key("creds").Value()
 		opt.Profiles = cfg.Section("options").Key("profiles").Value()
+		opt.SortField = cfg.Section("options").Key("sortfield").MustInt(-1)
 		opt.Noheader = (cfg.Section("options").Key("noheader").Value() == "true")
 	}
 	return opt
@@ -87,6 +88,7 @@ func main() {
 	regionString := flag.String("region", "", "region name")
 	credsString := flag.String("creds", "", "env, shared, iam")
 	profileSting := flag.String("profiles", "", "profile1,profile2,...")
+	sortfieldInt := flag.Int("sortfield", -1, "sort filed number")
 	noheader := flag.Bool("noheader", false, "hide header")
 	v := flag.Bool("v", false, "show version")
 	flag.Parse()
@@ -122,6 +124,9 @@ func main() {
 	}
 	if *profileSting != "" {
 		opt.Profiles = *profileSting
+	}
+	if *sortfieldInt != -1 {
+		opt.SortField = *sortfieldInt
 	}
 	opt.Noheader = opt.Noheader || *noheader
 

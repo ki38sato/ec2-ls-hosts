@@ -7,8 +7,28 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"regexp"
+	"sort"
 	"strings"
 )
+
+type FormattedEc2 struct {
+	Values []string
+	Index  int
+}
+
+type Ec2s []*FormattedEc2
+
+func (e Ec2s) Len() int {
+	return len(e)
+}
+
+func (e Ec2s) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+
+func (e Ec2s) Less(i, j int) bool {
+	return e[i].Values[e[i].Index] < e[j].Values[e[j].Index]
+}
 
 type Writer interface {
 	SetHeader(s []string)
@@ -33,6 +53,7 @@ type Options struct {
 	Region      string
 	Credentials string
 	Profiles    string
+	SortField   int
 	Noheader    bool
 }
 
@@ -40,6 +61,7 @@ func NewOptions() *Options {
 	opt := &Options{}
 	opt.Filters = make(map[string]string)
 	opt.TagFilters = make(map[string]string)
+	opt.SortField = -1
 	return opt
 }
 
@@ -70,9 +92,20 @@ func Describe(o *Options, w Writer) error {
 	if o.Noheader == false {
 		w.SetHeader(o.FieldNames())
 	}
+	formatedInstances := make([]*FormattedEc2, 0)
 	for _, inst := range instances {
 		values := formatInstance(inst, o.FieldNames())
-		w.Append(values)
+		fec2 := &FormattedEc2{
+			Values: values,
+			Index: o.SortField,
+		}
+		formatedInstances = append(formatedInstances, fec2)
+	}
+	if o.SortField != -1 {
+		sort.Sort(Ec2s(formatedInstances))
+	}
+	for _, inst := range formatedInstances {
+		w.Append(inst.Values)
 	}
 	w.Render()
 
